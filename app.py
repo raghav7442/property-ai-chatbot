@@ -61,7 +61,7 @@ def chat():
         properties_details.append(detail)
 
     # Return response including answer and property details
-    return jsonify({"response": answer, "property_details": properties_details})
+    return jsonify({"response": answer, "property_details": str(properties_details[0][0])})
 
 
 # Route to embed and save collection data
