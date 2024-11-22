@@ -1,58 +1,71 @@
 from bson import ObjectId
 from pymongo import MongoClient
 import os
+import pandas as pd
+from pprint import pprint
+
 
 # Connect to the MongoDB client
-client = MongoClient(os.getenv("MONGO_URI"))  
-db = client[os.getenv("DB_NAME")]  
+uri = "mongodb+srv://nikitavkaps:fcaboKTXdjNY8nzD@cluster0.f9tid.mongodb.net/property"
+client = MongoClient(uri)
+db = client["propertyai"]
 
 # Replace 'your_collection_name' with the collection you are querying
-property_metadata_collection = db[os.getenv("COLLECTION_NAME")]
+property_metadata_collection = db["propertymetadatas"]
 
 # Function to fetch property metadata
 def get_property_metadata(meta_id):
     pipeline = [
-        {"$match": {"_id": ObjectId(meta_id)}},
-        {
-            "$lookup": {
-                "from": "images",
-                "let": {"metaId": "$_id"},
-                "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$recordId", "$$metaId"]}}}
-                ],
-                "as": "images",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "properties",
-                "localField": "property",
-                "foreignField": "_id",
-                "as": "propertyDetails",
-            }
-        },
-        {"$unwind": {"path": "$propertyDetails", "preserveNullAndEmptyArrays": True}},
-        {
-            "$lookup": {
-                "from": "propertyowners",
-                "localField": "propertyDetails.property_owner",
-                "foreignField": "_id",
-                "as": "propertyDetails.propertyOwnerDetails",
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$propertyDetails.propertyOwnerDetails",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-    ]
+    {"$match": {"_id": ObjectId(meta_id)}},
+    {
+        "$lookup": {
+            "from": "images",
+            "let": {"metaId": "$_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": ["$recordId", "$$metaId"]}}},
+                {"$project": {"embedding": 0}},  # Exclude "embedding" from "images"
+            ],
+            "as": "images",
+        }
+    },
+    {
+        "$lookup": {
+            "from": "properties",
+            "localField": "property",
+            "foreignField": "_id",
+            "pipeline": [
+                {"$project": {"embedding": 0}}  # Exclude "embedding" from "properties"
+            ],
+            "as": "propertyDetails",
+        }
+    },
+    {"$unwind": {"path": "$propertyDetails", "preserveNullAndEmptyArrays": True}},
+    {
+        "$lookup": {
+            "from": "propertyowners",
+            "localField": "propertyDetails.property_owner",
+            "foreignField": "_id",
+            "pipeline": [
+                {"$project": {"embedding": 0}}  # Exclude "embedding" from "propertyowners"
+            ],
+            "as": "propertyDetails.propertyOwnerDetails",
+        }
+    },
+    {"$unwind": {"path": "$propertyDetails.propertyOwnerDetails", "preserveNullAndEmptyArrays": True}},
+    # Exclude "embedding" from the main collection
+    {
+        "$project": {
+            "embedding": 0,  # Exclude "embedding" field from the root document
+        }
+    },
+]
+
     
     # Execute the aggregation pipeline
     result = list(property_metadata_collection.aggregate(pipeline))
     return result
 
 # Replace with the actual meta_id
-meta_id = "your_meta_id_here"
-result = get_property_metadata(meta_id)
-print(result)
+# meta_id = "672cafd9d8de31a45e5513e2"
+# result = get_property_metadata(meta_id)
+# filtered_data = [{k: v for k, v in item.items() if k != "embedding"} for item in result]
