@@ -2,16 +2,16 @@ from bson import ObjectId
 from pymongo import MongoClient
 import os
 import pandas as pd
-from pprint import pprint
-
+from dotenv import load_dotenv
+load_dotenv()
 
 # Connect to the MongoDB client
-uri = "mongodb+srv://nikitavkaps:fcaboKTXdjNY8nzD@cluster0.f9tid.mongodb.net/property"
+uri = os.getenv("MONGO_URI")
 client = MongoClient(uri)
-db = client["propertyai"]
+db = client[os.getenv("DB_NAME")]
 
 # Replace 'your_collection_name' with the collection you are querying
-property_metadata_collection = db["propertymetadatas"]
+property_metadata_collection = db[os.getenv("COLLECTION_NAME")]
 
 # Function to fetch property metadata
 def get_property_metadata(meta_id):
