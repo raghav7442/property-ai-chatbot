@@ -66,6 +66,7 @@ def get_property_metadata(meta_id):
     return result
 
 # Replace with the actual meta_id
-# meta_id = "672cafd9d8de31a45e5513e2"
+# meta_id = "672a1e1b32fed2aad5917913"
 # result = get_property_metadata(meta_id)
+# print(result)
 # filtered_data = [{k: v for k, v in item.items() if k != "embedding"} for item in result]
