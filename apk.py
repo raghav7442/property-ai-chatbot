@@ -7,12 +7,14 @@ from openai import OpenAI
 from mongoembedding import MongoDBEmbeddings
 from get_embeddings import *
 import uuid
+from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
 
 # Initialize Flask application
 app = Flask(__name__)
+CORS(app)
 app.config.from_pyfile('config.py')
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
 
@@ -135,12 +137,9 @@ def generate_answer(user_input, email):
     REMEMBER TO GIVE ANY SUGGESTION only IN property context as i previously mentioned do not create any propery with your own
     REMEMBER TO GIVE THE PROPERTY SUGGESTONS BASED ON USER INTREST ONLY, LIKE IN HIS BUDGET, HIS WANTED PRICE, LIKE EVERYTHING IS BASED ON USER INTREST, WE CANNOT SUGGEST HIM IN OUT OF HIS INTREST..
     
-    Example Interactions:
-    User: "Hello"
-    Assistant: Hello, how can I assist you?
+    
 
-    User: "Can you suggest properties in Indore?"
-    Assistant: Sure, can you specify a preferred area within Indore?
+
     """
     
     # Generate response from OpenAI API
@@ -185,7 +184,7 @@ def chat():
 
     # Generate response from LLM with memory and property context
     response = generate_answer(question, email)
-    property=[str(prop['_id']) for prop in properties]
+    property=[str(prop) for prop in properties]
     # Return both the response and the properties as part of the JSON
     answer = jsonify({"response": response, "properties":property})
     return answer
@@ -208,3 +207,15 @@ def embed_collection():
 # Run the Flask application
 if __name__ == "__main__":
     app.run(debug=True, port=5005, host='0.0.0.0')
+
+
+
+
+
+# Example Interactions:
+#     User: "Hello"
+#     Assistant: {"response":"Hello, how can I assist you?", "properties":"the property in property context"}
+
+#     User: "Can you suggest properties in Indore?"
+#     Assistant: {"response":"yes i can suggest yoi", "properties":"the property in property context"}
+

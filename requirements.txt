@@ -3,3 +3,4 @@ python-dotenv
 pymongo
 openai
 pandas
+flask-cors
