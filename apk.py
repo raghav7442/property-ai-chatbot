@@ -205,10 +205,6 @@ def embed_collection():
     
     return jsonify({"message": result})
 
-
-
-
-
 # Run the Flask application
 if __name__ == "__main__":
-    app.run(debug=True, port=5005)
+    app.run(debug=True, port=5005, host='0.0.0.0')
