@@ -83,7 +83,10 @@ def chat():
         print(detail)  # Fetch property details
         properties_details.append(detail)
     data=serialize_document(properties_details)
-    josn=jsonify({"response": answer, "property_details": data[0]})
+    if not properties_details:
+        josn=jsonify({"response": answer, "property_details": properties_details})
+    else:
+        josn=jsonify({"response": answer, "property_details": data[0]})
     
     return josn
 
