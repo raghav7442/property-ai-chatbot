@@ -71,20 +71,20 @@ def chat():
     # Generate response from LLM with memory and property context
     response = generate_answer(question, email)
     answer = response["response"]
-    print(answer)
+    # print(answer)
     property_ids = response["properties"]
-    print(property_ids)
+    # print(property_ids)
     properties_details = []
 
     # Fetch property details based on the property IDs
     if property_ids:
         for property_id in property_ids:
             detail = get_property_metadata(property_id)
-            print(detail)  # Fetch property details
+            # print(detail)  # Fetch property details
             properties_details.append(detail)
         data=serialize_document(properties_details)
         josn=jsonify({"response": answer, "property_details": data[0]})
-        print(josn)
+        # print(josn)
     else:
         josn=jsonify({"response": answer, "property_details": property_ids})
     return josn
