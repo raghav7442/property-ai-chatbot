@@ -77,17 +77,14 @@ def chat():
     properties_details = []
 
     # Fetch property details based on the property IDs
-    if property_ids=="":
-        josn=jsonify({"response": answer, "property_details": property_ids})
-        # print(josn)
-    else:
-        for property_id in property_ids:
-            detail = get_property_metadata(property_id)
-            # print(detail)  # Fetch property details
-            properties_details.append(detail)
-        data=serialize_document(properties_details)
-        josn=jsonify({"response": answer, "property_details": data[0]})
-        
+  
+    for property_id in property_ids:
+        detail = get_property_metadata(property_id)
+        print(detail)  # Fetch property details
+        properties_details.append(detail)
+    data=serialize_document(properties_details)
+    josn=jsonify({"response": answer, "property_details": data[0]})
+    
     return josn
 
 
