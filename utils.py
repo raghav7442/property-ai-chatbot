@@ -213,7 +213,7 @@ def generate_answer(user_input, email):
     assistant_response = completion.choices[0].message.content
     # print(assistant_response["properties"])
     json_data = json.loads(assistant_response)
-    print(json_data)
+    # print(json_data)
     
     # Save the generated answer to MongoDB chat history
     save_message_to_mongo(user_input, assistant_response, email, chat_history_collection)

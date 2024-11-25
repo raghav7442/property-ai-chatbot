@@ -6,7 +6,30 @@ import uuid
 from flask_cors import CORS
 from get_property_details import get_property_metadata
 from utils import *
+from bson import ObjectId
 
+def serialize_document(document):
+    """
+    Recursively converts MongoDB documents to JSON-serializable format.
+    Handles ObjectId, datetime, and nested structures.
+    """
+    if isinstance(document, list):
+        # Process each document in the list
+        return [serialize_document(doc) for doc in document]
+    elif isinstance(document, dict):
+        # Process nested dictionaries
+        return {
+            key: serialize_document(value) for key, value in document.items()
+        }
+    elif isinstance(document, ObjectId):
+        # Convert ObjectId to string
+        return str(document)
+    elif isinstance(document, datetime.datetime):
+        # Convert datetime to ISO 8601 string
+        return document.isoformat()
+    else:
+        # Return other types unchanged
+        return document
 
 # Load environment variables from .env file
 load_dotenv()
@@ -52,16 +75,23 @@ def chat():
     # Generate response from LLM with memory and property context
     response = generate_answer(question, email)
     answer = response["response"]
+    print(answer)
     property_ids = response["properties"]
+    print(property_ids)
     properties_details = []
 
     # Fetch property details based on the property IDs
-    for property_id in property_ids:
-        detail = get_property_metadata(property_id)  # Fetch property details
-        properties_details.append(detail)
-
-    # Return response including answer and property details
-    return jsonify({"response": answer, "property_details": str(properties_details[0][0])})
+    if property_ids:
+        for property_id in property_ids:
+            detail = get_property_metadata(property_id)
+            print(detail)  # Fetch property details
+            properties_details.append(detail)
+        data=serialize_document(properties_details)
+        josn=jsonify({"response": answer, "property_details": data})
+        print(josn)
+    else:
+        josn=jsonify({"response": answer, "property_details": property_ids})
+    return josn
 
 
 # Route to embed and save collection data
