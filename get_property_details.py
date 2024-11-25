@@ -25,14 +25,20 @@ db = client[os.getenv("DB_NAME")]
 # Replace 'your_collection_name' with the collection you are querying
 property_metadata_collection = db[os.getenv("COLLECTION_NAME")]
 
+# Function to normalize ObjectId to string
+def normalize_objectids(data):
+    if isinstance(data, list):
+        return [normalize_objectids(item) for item in data]
+    elif isinstance(data, dict):
+        return {key: str(value) if isinstance(value, ObjectId) else normalize_objectids(value) for key, value in data.items()}
+    return data
+
 # Function to fetch property metadata for a single meta_id
 def get_single_property_metadata(meta_id):
     try:
-        # Validate meta_id
         if not ObjectId.is_valid(meta_id):
             raise ValueError(f"Invalid meta_id: {meta_id} is not a valid ObjectId.")
 
-        # Define the aggregation pipeline
         pipeline = [
             {"$match": {"_id": ObjectId(meta_id)}},
             {
@@ -73,12 +79,10 @@ def get_single_property_metadata(meta_id):
             {"$project": {"embedding": 0}},
         ]
 
-        # Execute the aggregation pipeline
         logging.info(f"Executing pipeline for meta_id: {meta_id}")
         result = list(property_metadata_collection.aggregate(pipeline))
 
-        # Convert the result to JSON-compatible format
-        return json.loads(json_util.dumps(result))
+        return normalize_objectids(result)
 
     except ValueError as ve:
         logging.error(f"Validation error: {ve}")
@@ -94,16 +98,14 @@ def get_property_metadata(meta_ids):
         if not isinstance(meta_ids, list):
             raise ValueError("meta_ids must be a list of ObjectIds.")
 
-        # Iterate through the IDs and collect results
         all_results = []
         for meta_id in meta_ids:
             result = get_single_property_metadata(meta_id)
             if "error" not in result:
-                all_results.extend(result)  # Append results if no error
+                all_results.extend(result)
             else:
                 logging.warning(f"Skipping meta_id {meta_id} due to error: {result['error']}")
 
-        # Return a valid JSON object
         logging.info(f"Retrieved metadata for {len(all_results)} records.")
         return all_results
 
@@ -116,13 +118,11 @@ def get_property_metadata(meta_ids):
         return {"error": "An unexpected error occurred. Please check the logs for details."}
 
 # Example usage
-if __name__ == "__main__":
-    # Replace with the actual meta_ids (single or multiple)
-    meta_ids = ["673b27fe4483cd7d1a3df9fd", "623b27fe4483cd7d1a3df9fa"]  # Example IDs
-    result = get_property_metadata(meta_ids)
-    if "error" in result:
-        logging.error(f"Failed to fetch property metadata: {result['error']}")
-    else:
-        # Process the result if needed
-        logging.info("Property metadata retrieved successfully.")
-        print(json.dumps(result, indent=4))
+# if __name__ == "__main__":
+#     meta_ids = ["673b27fe4483cd7d1a3df9fd", "623b27fe4483cd7d1a3df9fa"]
+#     result = get_property_metadata(meta_ids)
+#     if "error" in result:
+#         logging.error(f"Failed to fetch property metadata: {result['error']}")
+#     else:
+#         logging.info("Property metadata retrieved successfully.")
+#         print(json.dumps(result, indent=4))
