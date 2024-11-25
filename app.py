@@ -74,21 +74,16 @@ def chat():
     # print(answer)
     property_ids = response["properties"]
     # print(property_ids)
-    properties_details = []
+    property=get_property_metadata(property_ids)
 
     # Fetch property details based on the property IDs
-  
-    for property_id in property_ids:
-        detail = get_property_metadata(property_id)
-        print(detail)  # Fetch property details
-        properties_details.append(detail)
-    data=serialize_document(properties_details)
-    if not properties_details:
-        josn=jsonify({"response": answer, "property_details": properties_details})
-    else:
-        josn=jsonify({"response": answer, "property_details": data[0]})
+    # # data=serialize_document(properties_details)
+    # if not properties_details:
+    #     josn=
+    # else:
+    #     josn=jsonify({"response": answer, "property_details": properties_details})
     
-    return josn
+    return jsonify({"response": answer, "property_details": property})
 
 
 # Route to embed and save collection data
