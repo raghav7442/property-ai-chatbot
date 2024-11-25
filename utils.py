@@ -189,7 +189,8 @@ def generate_answer(user_input, email):
     otherwise you will give them the property id's
     only 3 id you will return for each time
     you will return json only
-
+    for each time like this:
+        "response":"Hello, how can I assist you?", "properties":[]
 
     
     Example Interactions:
