@@ -11,24 +11,20 @@ from bson import ObjectId
 def serialize_document(document):
     """
     Recursively converts MongoDB documents to JSON-serializable format.
-    Handles ObjectId, datetime, and nested structures.
+    - Converts ObjectId to string.
+    - Converts datetime to ISO 8601 string.
     """
     if isinstance(document, list):
-        # Process each document in the list
         return [serialize_document(doc) for doc in document]
     elif isinstance(document, dict):
-        # Process nested dictionaries
         return {
             key: serialize_document(value) for key, value in document.items()
         }
     elif isinstance(document, ObjectId):
-        # Convert ObjectId to string
         return str(document)
     elif isinstance(document, datetime.datetime):
-        # Convert datetime to ISO 8601 string
         return document.isoformat()
     else:
-        # Return other types unchanged
         return document
 
 # Load environment variables from .env file
