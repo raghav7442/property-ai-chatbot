@@ -1,54 +1,44 @@
-# get_embeddings.py
-
 from pymongo import MongoClient
 import pandas as pd
 from openai import OpenAI
 import os
+
 # MongoDB connection setup
 def get_mongo_collection(collection_name):
-    # Replace with your MongoDB connection string
     mongo_client = MongoClient(os.getenv("MONGO_URI"))
     db = mongo_client[os.getenv("DB_NAME")]
-    collection = db[collection_name]
-    return collection
-
-# Load data from the specified collection into a DataFrame
-def load_data(collection):
-    data = list(collection.find())
-    return pd.DataFrame(data)
+    return db[collection_name]
 
 # Generate embeddings for a given text
 def generate_embedding(text):
     client = OpenAI()
     response = client.embeddings.create(
-    input=text,
-    model="text-embedding-3-small"
+        input=text,
+        model="text-embedding-3-small"
     )
+    return response.data[0].embedding
 
-    embedding = response.data[0].embedding
-    return embedding
-
-# Generate embeddings for each document in the DataFrame and update the collection
+# Process each document row by row
 def generate_and_save_embeddings(collection_name):
     collection = get_mongo_collection(collection_name)
-    df = load_data(collection)
-    print(df.head())
+    cursor = collection.find()  # Fetch documents from MongoDB
 
-    if df.empty:
-        return "No documents found in the collection."
-      # Ensure there is an 'embedding' column in the DataFrame
-    if 'embedding' not in df.columns:
-        df['embedding'] = None
+    updated_count = 0  # Counter for updated rows
 
-    # Generate embeddings only if 'embedding' field is None, else keep existing
-    df['embedding'] = df.apply(
-        lambda row: generate_embedding(' '.join(map(str, row.values))) 
-                           if row['embedding'] is None else row['embedding'], 
-                           axis=1
-                           )
+    for document in cursor:
+        # Combine fields for embedding generation
+        text = f"{document.get('name', '')} {document.get('description', '')}"
+        
+        # Generate embedding for the current document
+        embedding = generate_embedding(text)
+        
+        # Update the document in MongoDB
+        collection.update_one(
+            {'_id': document['_id']},
+            {"$set": {"embedding": embedding}}
+        )
+        
+        updated_count += 1
+        print(f"Updated document ID: {document['_id']}")
 
-    # Update each document in MongoDB with the new embeddings
-    for _, row in df.iterrows():
-        collection.update_one({'_id': row['_id']}, {"$set": {"embedding": row['embedding']}})
-
-    return "Embeddings generated and saved successfully where needed."
+    return f"Embedding generation complete. Total documents updated: {updated_count}"
