@@ -325,25 +325,27 @@ Requirements:
 
 Example response:
 {{"properties": ["id1", "id2", "id3"]}}
+
+remember to give only the reponse based on both context, do not create any response with your own
 """
     completion = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": query}
-    ]
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": query}
+        ]
     )
     assistant_response = completion.choices[0].message.content
+
     try:
-        # Check if response is already in JSON format
-        if assistant_response.strip().startswith('{') and assistant_response.strip().endswith('}'):
-            # Parse as JSON directly
-            json_data = json.loads(assistant_response.strip())
-        else:
-            # Add braces to make it JSON compatible
-            fixed_response = f'{{{assistant_response.strip()}}}'
-            json_data = json.loads(fixed_response)
+        # Clean up Markdown formatting if present
+        if assistant_response.startswith("```") and assistant_response.endswith("```"):
+            assistant_response = assistant_response.strip("```").strip()
+
+        # Parse JSON
+        json_data = json.loads(assistant_response.strip())
     except json.JSONDecodeError as e:
         print(f"JSON Decode Error: {e}")
         raise ValueError(f"Invalid JSON format in response: {assistant_response}")
+    
     return json_data
