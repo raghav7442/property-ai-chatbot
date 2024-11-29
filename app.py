@@ -101,8 +101,9 @@ def chat():
     property_ids = response["properties"]
     # print(property_ids)
     property = get_property_metadata(property_ids) if property_ids else []
-
-    return jsonify({"response": answer, "property_details": property})
+    final_response=jsonify({"response": answer, "property_details": property})
+    print(final_response)
+    return final_response
 
 
 # Route to embed and save collection data
