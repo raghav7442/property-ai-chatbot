@@ -60,50 +60,38 @@ def affordablity_analysis():
 # Route to handle chat interaction
 @app.route('/chat', methods=['POST'])
 def chat():
-    """
-    Main chat route for user interaction.
-    - Accepts JSON input with 'email' and 'question'.
-    - Generates a response considering the conversation history and property data.
-    - Returns the generated response as JSON.
-    """
-    # Extract data from incoming JSON request
     data = request.json
-    auth_token=data.get("auth")
-    print(data)
+    auth_token = data.get("auth")
+    ids=data.get("ids")
     question = data.get("question")
-    
-    # Validate 'question' parameter
+
     if not isinstance(question, str) or len(question.strip()) == 0:
-      return jsonify({"error": "Invalid 'question' format. Must be a non-empty string."}), 400
+        return jsonify({"error": "Invalid 'question' format. Must be a non-empty string."}), 400
     if len(question) > 500:
         return jsonify({"error": "The 'question' field exceeds the maximum allowed length of 500 characters."}), 400
-
 
     try:
         auth = jwt_verify(auth_token)
     except ValueError as e:
-         return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
-    
-    # Handle guest users (if no email is provided)
-    if not auth_token or auth_token =="" or auth_token ==None: 
-        if "guest_session" not in session:
-            session["guest_session"] = str(uuid.uuid4())  
+        return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
+
+    if not auth_token:
+        
         auth = {
-            "email": f"guest_{session['guest_session']}",
+            "email": f"{ids}",
             "name": "Guest",
-            "gender": "Unknown",  
+            "gender": "Unknown",
         }
 
-    # Generate response from LLM with memory and property context
-    response = generate_answer(question, auth)
-    answer = response["response"]
-    # print(answer)
-    property_ids = response["properties"]
-    # print(property_ids)
-    property = get_property_metadata(property_ids) if property_ids else []
-    final_response=jsonify({"response": answer, "property_details": property})
-    print(final_response)
-    return final_response
+    try:
+        response = generate_answer(question, auth)
+        answer = response["response"]
+        property_ids = response.get("properties", [])
+        property_details = get_property_metadata(property_ids) if property_ids else []
+        return jsonify({"response": answer, "property_details": property_details})
+    except ValueError as e:
+        return jsonify({"error": f"Failed to process response: {str(e)}"}), 500
+
 
 
 # Route to embed and save collection data
