@@ -85,7 +85,7 @@ def chat():
          return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
     
     # Handle guest users (if no email is provided)
-    if not auth_token or not auth_token["email"] or auth_token =="" or auth_token ==None: 
+    if not auth_token or auth_token =="" or auth_token ==None: 
         if "guest_session" not in session:
             session["guest_session"] = str(uuid.uuid4())  
         auth = {
