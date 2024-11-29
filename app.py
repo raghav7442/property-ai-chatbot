@@ -14,8 +14,8 @@ load_dotenv()
 
 # Initialize Flask application
 app = Flask(__name__)
-# CORS(app, resources={r"/*": {"origins": "*"}})
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://property-ai-webapp-frontend.vercel.app/"]}})
+CORS(app, resources={r"/*": {"origins": "*"}})
+# CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://property-ai-webapp-frontend.vercel.app/"]}})
 
 app.config.from_pyfile('config.py')  
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  
