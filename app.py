@@ -8,33 +8,16 @@ from get_property_details import get_property_metadata
 from utils import *
 from bson import ObjectId
 
-def serialize_document(document):
-    """
-    Recursively converts MongoDB documents to JSON-serializable format.
-    - Converts ObjectId to string.
-    - Converts datetime to ISO 8601 string.
-    """
-    if isinstance(document, list):
-        return [serialize_document(doc) for doc in document]
-    elif isinstance(document, dict):
-        return {
-            key: serialize_document(value) for key, value in document.items()
-        }
-    elif isinstance(document, ObjectId):
-        return str(document)
-    elif isinstance(document, datetime.datetime):
-        return document.isoformat()
-    else:
-        return document
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Initialize Flask application
 app = Flask(__name__)
-CORS(app)  # Enable CORS for cross-origin requests
-app.config.from_pyfile('config.py')  # Load configuration from a separate file
-app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  # Set secret key from environment variable
+CORS(app)  
+app.config.from_pyfile('config.py')  
+app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  
+
 
 
 # Route for health check to verify the service is running
@@ -42,6 +25,34 @@ app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  # Set secre
 def check():
     """API route to check if the service is up and running."""
     return jsonify({"status": "Service is running"}), 200
+
+
+@app.route("/afford", methods=['POST'])
+def affordablity_analysis():
+    data = request.json
+
+        # Validate input parameters
+    max_price = data.get("max_price")
+    min_price = data.get("min_price")
+    property_area = data.get("property_area")
+    location = data.get("location")
+
+
+    query=f'can i get the properties with in max price {max_price}, min price {min_price} property area {property_area} '
+
+    properties=(affordable(query,location))
+    ids=properties["properties"]
+    # print(properties[0][0])
+    if len(ids)>0:
+        print("inside if")
+        full_property_id=get_property_metadata(ids) if ids else []
+        
+        
+    # print(full_property_id)
+        return full_property_id
+    else:
+        print("in ek")
+        return properties
 
 
 # Route to handle chat interaction
@@ -55,34 +66,40 @@ def chat():
     """
     # Extract data from incoming JSON request
     data = request.json
-    email = data.get("email")
+    auth_token=data.get("auth")
+    print(data)
     question = data.get("question")
     
     # Validate 'question' parameter
-    if not question:
-        return jsonify({"error": "The 'question' field is required."}), 400
+    if not isinstance(question, str) or len(question.strip()) == 0:
+      return jsonify({"error": "Invalid 'question' format. Must be a non-empty string."}), 400
+    if len(question) > 500:
+        return jsonify({"error": "The 'question' field exceeds the maximum allowed length of 500 characters."}), 400
 
+
+    try:
+        auth = jwt_verify(auth_token)
+    except ValueError as e:
+         return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
+    
     # Handle guest users (if no email is provided)
-    if not email or email == "" or email is None:
-        if 'guest_session' not in session:
-            session['guest_session'] = str(uuid.uuid4())  # Generate a unique session ID for the guest
-        email = f"guest_{session['guest_session']}"
+    if not auth_token or not auth_token.get("email") or auth_token =="" or auth_token ==None: 
+        if "guest_session" not in session:
+            session["guest_session"] = str(uuid.uuid4())  
+        auth = {
+            "email": f"guest_{session['guest_session']}",
+            "name": "Guest",
+            "gender": "Unknown",  
+        }
 
     # Generate response from LLM with memory and property context
-    response = generate_answer(question, email)
+    response = generate_answer(question, auth)
     answer = response["response"]
     # print(answer)
     property_ids = response["properties"]
     # print(property_ids)
-    property=get_property_metadata(property_ids)
+    property = get_property_metadata(property_ids) if property_ids else []
 
-    # Fetch property details based on the property IDs
-    # # data=serialize_document(properties_details)
-    # if not properties_details:
-    #     josn=
-    # else:
-    #     josn=jsonify({"response": answer, "property_details": properties_details})
-    
     return jsonify({"response": answer, "property_details": property})
 
 
@@ -106,4 +123,4 @@ def embed_collection():
 
 # Run the Flask application on specified host and port
 if __name__ == "__main__":
-    app.run(debug=True, port=5005, host='0.0.0.0')
+    app.run(debug=True, port=5006, host='0.0.0.0')

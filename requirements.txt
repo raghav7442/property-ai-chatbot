@@ -4,3 +4,4 @@ pymongo
 openai
 pandas
 flask-cors
+PyJWT

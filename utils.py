@@ -5,7 +5,7 @@ from openai import OpenAI
 from mongoembedding import MongoDBEmbeddings
 from get_embeddings import *
 import json
-
+import jwt
 # Initialize OpenAI client for LLM
 client = OpenAI()
 
@@ -20,9 +20,23 @@ embedding_handler = MongoDBEmbeddings(
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
 db = mongo_client[os.getenv("DB_NAME")]
 chat_history_collection = db["chat_history"]
+jwt_secret=os.getenv("JWT_SECRET")
+
+def jwt_verify(token):
+    if token:
+        jwt_token=jwt.decode(jwt=token, key=jwt_secret, algorithms=["HS256"])
+        extracted_data={
+            "name":jwt_token["user"]["name"],
+            "email":jwt_token["user"]["email"],
+            "gender":jwt_token["user"]["gender"]
+
+        }
+        return extracted_data
+    else:
+        return "expected token", 200
 
 
-def save_message_to_mongo(user_content, ai_content, email, collection):
+def save_message_to_mongo(user_content, ai_content, email, collection,chat_summary):
     """
     Save a message in MongoDB in the following format:
     - Adds the message as a new entry in the chat history.
@@ -35,10 +49,12 @@ def save_message_to_mongo(user_content, ai_content, email, collection):
     }
     collection.update_one(
         {"email": email},
-        {"$push": {f"history": message}},
+       {
+            "$push": {"history": message},
+            "$set": {"summary": chat_summary}
+        },
         upsert=True
     )
-
 
 
 def fetch_chat_history(email):
@@ -52,6 +68,22 @@ def fetch_chat_history(email):
         # Return only the last 'limit' number of messages for brevity in memory
         return session_chat[:]
     return []
+
+def create_summary(email):
+    chat_history=fetch_chat_history(email)
+    memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
+    prompt=f"""you have to create a very short user driven chatsummary respected to user what user wnat to say in this history
+    here is chat context   {memory_context} 
+    """
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": memory_context}
+        ]
+    )
+    assistant_response = completion.choices[0].message.content
+    return assistant_response
 
 
 
@@ -119,9 +151,9 @@ def generate_answer(user_input, email):
     """
     
     # Fetch previous chat history for context
-    chat_history = fetch_chat_history(email)
+    chat_history = fetch_chat_history(email["email"])
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
-    
+    print(email)
     # Fetch property recommendations based on the current user query
     property_context = get_query_results(user_input, limit=6)
     # print(property_context)
@@ -130,7 +162,27 @@ def generate_answer(user_input, email):
     prompt = f"""Given the following memory context:\n{memory_context}\n
     And the following property context: {property_context}\n
     You are a Property Recommender chatbot, a professional yet friendly AI assistant:
-    
+    Before giving any details, first check this without checking this, you cannot proced anything
+    when the user came to you you will find the user is logged in or not, firstly, if he logged in you will get the valid user name, emailid, and gender, if the name and email guest in {email} you ask 3 questions to him one by one, his name, his mobile number and his email like this
+
+    if you got correct details, 
+    you will revert like
+
+    hello user_name, welcome to the ai peroperty recommedation chatbot how can i help you today?
+
+    if in case you got guest email, and name, you will act like this,
+
+    It seems you are not signed in before procedding with chat, can i have your name please?
+    after getting his name
+
+    Thanks for providing name, can i have your valid email id?
+    when we send his mail id,
+
+    than you will ask, him his mobile number
+
+    after getting all these details, now can chat with him like below, if he did'nt give details, ask politly without taking these details, you cannot proced to chatbot.
+
+
     **Mission:** Guide the user with property-related inquiries. If interested in buying, ask about location, budget, and property type.
     **Tone:** Friendly and professional, like JARVIS from Iron Man.
     
@@ -212,10 +264,86 @@ def generate_answer(user_input, email):
         ]
     )
     assistant_response = completion.choices[0].message.content
-    # print(assistant_response["properties"])
-    json_data = json.loads(assistant_response)
-    print(json_data)
+    print("Raw Assistant Response:", repr(assistant_response))
+    
+    try:
+        # Check if response is already in JSON format
+        if assistant_response.strip().startswith('{') and assistant_response.strip().endswith('}'):
+            # Parse as JSON directly
+            json_data = json.loads(assistant_response.strip())
+        else:
+            # Add braces to make it JSON compatible
+            fixed_response = f'{{{assistant_response.strip()}}}'
+            json_data = json.loads(fixed_response)
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error: {e}")
+        raise ValueError(f"Invalid JSON format in response: {assistant_response}")
     
     # Save the generated answer to MongoDB chat history
-    save_message_to_mongo(user_input, assistant_response, email, chat_history_collection)
+    summary=create_summary(email["email"])
+    save_message_to_mongo(user_input, assistant_response, email["email"], chat_history_collection,chat_summary=summary)
+    return json_data
+
+
+
+
+def affordable(query, location):
+
+    if not location or "latitude" not in location or "longitude" not in location:
+        return{"error": "Invalid location data"}, 400
+
+    # Extract latitude and longitude
+    latitude = location["latitude"]
+    longitude = location["longitude"]
+
+    # Convert range to radians
+    range_in_radians = 25 / 6378.1 
+    loc = {
+        "location": {
+            "$geoWithin": {
+                "$centerSphere": [[longitude, latitude], range_in_radians]
+            }
+        }
+    }
+
+    # Fetch matching locations
+    results = list(embedding_handler.collection.find(loc, {"_id": 0, "embedding":0}))
+    # print(results)
+
+
+    property_context=get_query_results(query, limit=6)
+    prompt=f"""
+You are an affordability analysis tool. Your job is to analyze and return relevant property IDs based on the following contexts:
+
+- **Property Context:** {property_context}
+- **Location Context:** {results}
+
+Requirements:
+1. Always return the property IDs as an array.
+2. Respond only with plain JSON format (no Markdown or additional formatting).
+3. If no properties match, provide at least 2-3 alternative property IDs from the location context.
+
+Example response:
+{{"properties": ["id1", "id2", "id3"]}}
+"""
+    completion = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": query}
+    ]
+    )
+    assistant_response = completion.choices[0].message.content
+    try:
+        # Check if response is already in JSON format
+        if assistant_response.strip().startswith('{') and assistant_response.strip().endswith('}'):
+            # Parse as JSON directly
+            json_data = json.loads(assistant_response.strip())
+        else:
+            # Add braces to make it JSON compatible
+            fixed_response = f'{{{assistant_response.strip()}}}'
+            json_data = json.loads(fixed_response)
+    except json.JSONDecodeError as e:
+        print(f"JSON Decode Error: {e}")
+        raise ValueError(f"Invalid JSON format in response: {assistant_response}")
     return json_data
