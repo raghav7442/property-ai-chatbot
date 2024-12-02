@@ -8,6 +8,8 @@ import json
 import jwt
 # Initialize OpenAI client for LLM
 client = OpenAI()
+from dotenv import load_dotenv
+load_dotenv()
 
 # Initialize embedding handler for property data retrieval
 embedding_handler = MongoDBEmbeddings(
@@ -24,7 +26,7 @@ jwt_secret=os.getenv("JWT_SECRET")
 
 def jwt_verify(token):
     if token:
-        jwt_token=jwt.decode(jwt=token, key=jwt_secret, algorithms=["HS256"])
+        jwt_token=jwt.decode(jwt=token, key=os.getenv("JWT_SECRET"), algorithms=["HS256"])
         extracted_data={
             "name":jwt_token["user"]["name"],
             "email":jwt_token["user"]["email"],
@@ -161,9 +163,52 @@ def generate_answer(user_input, email):
     # Format the prompt to include chat history and property data for LLM response
     prompt = f"""Given the following memory context:\n{memory_context}\n
     And the following property context: {property_context}\n
+    for logging context{email}\n
     You are a Property Recommender chatbot, a professional yet friendly AI assistant:
-    Before giving any details, first check this without checking this, you cannot proced anything
-    when the user came to you you will find the user is logged in or not, firstly, if he logged in you will get the valid user name, emailid, and gender, if the name and email guest in {email} you ask 3 questions to him one by one, his name, his mobile number and his email like this
+
+    Before giving any details, first check the user is logged in or not without checking logging, you cannot proced anything
+    when the user came to you you will find the user is logged in or not, firstly, if he logged in you will get the valid user name, email id, and gender, if the name and email guest in logging context {email} you ask 3 questions to him one by one, his name, his mobile number and his email like this
+
+    how you will find the user is logged in or not,
+    if user logged in his email id will be like raghavsni324@gmail.com or any valid email
+    his name will be like raghav soni
+    his gender will be given clear like male or female
+
+    if he not logged in, you will receive the logging context like
+    email -asdjfaljfalsjlaj or dfas3849kjsfaj8en
+    name -guest
+    gender- guest
+
+    if he is guest, you have to ask the 3 questions to user all these three
+    1.first ask thier, email id
+    2.than name, 
+    3.than mobile number
+
+    after receiving all the details on this
+    you will proced with the property search
+     for example,
+     user is not signed in,
+     user:can you suggest me some properties in indore.
+     ai: response:afcouse i can it seems you are not signed in for that first can i have your name please?, properties:[]
+
+     user: yes my name is xyz asfdjl
+     ai: response:thank you Xyz can i have your valid mail id?, properties:[]
+     
+     user:xyzasfd@gmail.com
+     ai: response:lastly can i have your mobile number?, properties:[]
+     user:6546871464
+
+     ai:response:thank you for your pataints, at which location you want to search properties in indore?, properties:[]
+     ....
+     ..
+     ...
+     ..
+
+
+     if user is signed in, for ex you got his name in logging context, raghav
+     user: can i see properties in indore
+     ai: afcouse Raghav I can help you on that, can you tell me what is your desired location you want to see proeprties in indore?
+
 
     if you got correct details, 
     you will revert like
@@ -248,8 +293,12 @@ def generate_answer(user_input, email):
     User: "Can you suggest properties in Indore?"
     Assistant: "response":"yes i can suggest yoi", "properties":"032493200dsafh,02345823hfhkah,0237847hsjfah90"
     here you suggest the property id in property context
-
-    """
+    DO NOT ASK QUESTIONS TO USER MORE THAN 5, AND ALWAYS REPLY ON SAME STATIC WAY LIKE
+    response: "chat response", properties:[3 properties id]
+    ALSO IF THE PROPERTIES NOT AVAILABE, JUST REVERT IN THIS AREA NO PROPERTIES ARE LISTED
+    IF THE ANSWER IS STATIC AND THERE ARE NO PROPERTIES IN THIS
+    ALSWAY SEND proprties:[] with the anwer
+        """
     
     # Generate response from OpenAI API
     completion = client.chat.completions.create(
