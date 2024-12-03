@@ -78,8 +78,8 @@ def chat():
     if not auth_token:
         
         auth = {
-            "email": f"{ids}",
             "name": "Guest",
+            "email": f"{ids}",
             "gender": "Unknown",
         }
 

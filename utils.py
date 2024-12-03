@@ -6,6 +6,7 @@ from mongoembedding import MongoDBEmbeddings
 from get_embeddings import *
 import json
 import jwt
+from prompt import *
 # Initialize OpenAI client for LLM
 client = OpenAI()
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ def jwt_verify(token):
     if token:
         jwt_token=jwt.decode(jwt=token, key=os.getenv("JWT_SECRET"), algorithms=["HS256"])
         extracted_data={
+            "id":jwt_token["user"]["_id"],
             "name":jwt_token["user"]["name"],
             "email":jwt_token["user"]["email"],
             "gender":jwt_token["user"]["gender"]
@@ -57,6 +59,65 @@ def save_message_to_mongo(user_content, ai_content, email, collection,chat_summa
         },
         upsert=True
     )
+
+
+# def save_message_to_mongo(user_content, ai_content, email, collection, chat_summary, ip_address, name):
+#     """
+#     Save a message in MongoDB in the following format:
+#     - Adds the message as a new entry in the chat history.
+#     - Upserts the document if it doesn’t exist for a given email.
+#     - Includes additional fields: IP address, email, and name.
+#     """
+#     message = {
+#         "req": user_content,
+#         "res": ai_content,
+#         "timestamp": datetime.datetime.utcnow()
+#     }
+#     collection.update_one(
+#         {"email": email},
+#         {
+#             "$set": {
+#                 "email": email,
+#                 "ip_address": ip_address,
+#                 "name": name,
+#                 "summary": chat_summary
+#             },
+#             "$push": {"history": message}
+#         },
+#         upsert=True
+#     )
+
+
+
+def fetch_chat_history(email=None, ip_address=None, collection=None):
+    """
+    Find a chat document by email or IP address.
+    
+    Args:
+        email (str): The email address of the user.
+        ip_address (str): The IP address of the user.
+        collection: The MongoDB collection object.
+    
+    Returns:
+        list: A list of chat documents that match the query.
+    """
+    query = {}
+    
+    # Build query based on available parameters
+    if email and ip_address:
+        query = {"$or": [{"email": email}, {"ip_address": ip_address}]}
+    elif email:
+        query = {"email": email}
+    elif ip_address:
+        query = {"ip_address": ip_address}
+    else:
+        raise ValueError("At least one of email or ip_address must be provided.")
+
+    # Execute the query
+    chats = collection.find(query)
+    return list(chats)  # Convert the cursor to a list
+
+
 
 
 def fetch_chat_history(email):
@@ -154,157 +215,43 @@ def generate_answer(user_input, email):
     
     # Fetch previous chat history for context
     chat_history = fetch_chat_history(email["email"])
+    # chat_history = fetch_chat_history(email["email"],email["id"],chat_history_collection)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
     print(email)
     # Fetch property recommendations based on the current user query
     property_context = get_query_results(user_input, limit=6)
     # print(property_context)
     
-    # Format the prompt to include chat history and property data for LLM response
-    prompt = f"""Given the following memory context:\n{memory_context}\n
-    And the following property context: {property_context}\n
-    for logging context{email}\n
-    You are a Property Recommender chatbot, a professional yet friendly AI assistant:
+  
+    prompt_user=f"""
+    logging context={email}
+    memorycontext={memory_context}
+    property context={property_context}
 
-    Before giving any details, first check the user is logged in or not without checking logging, you cannot proced anything
-    when the user came to you you will find the user is logged in or not, firstly, if he logged in you will get the valid user name, email id, and gender, if the name and email guest in logging context {email} you ask 3 questions to him one by one, his name, his mobile number and his email like this
+    logging context to check the user signed in or not
+    for signin or login here is the guildliens
+    GUIDLIENS FOR LOGGING CHECK
+    {logging}
 
-    how you will find the user is logged in or not,
-    if user logged in his email id will be like raghavsni324@gmail.com or any valid email
-    his name will be like raghav soni
-    his gender will be given clear like male or female
+    after checking the user's logging status you will start the conversation witht the user, here is the detaild flow of the conversation, you have to be static as it is,
+    {task}
 
-    if he not logged in, you will receive the logging context like
-    email -asdjfaljfalsjlaj or dfas3849kjsfaj8en
-    name -guest
-    gender- guest
+    for the conversation refference here are some basic examples to intract with the user,
+    {sample_conversations}
 
-    if he is guest, you have to ask the 3 questions to user all these three
-    1.first ask thier, email id
-    2.than name, 
-    3.than mobile number
-
-    after receiving all the details on this
-    you will proced with the property search
-     for example,
-     user is not signed in,
-     user:can you suggest me some properties in indore.
-     ai: response:afcouse i can it seems you are not signed in for that first can i have your name please?, properties:[]
-
-     user: yes my name is xyz asfdjl
-     ai: response:thank you Xyz can i have your valid mail id?, properties:[]
-     
-     user:xyzasfd@gmail.com
-     ai: response:lastly can i have your mobile number?, properties:[]
-     user:6546871464
-
-     ai:response:thank you for your pataints, at which location you want to search properties in indore?, properties:[]
-     ....
-     ..
-     ...
-     ..
+    REMEMBER, you have to very strict with the guidliens,
+    WHEN EVER FOR EACH CONVERSATION YOUR RESPONSE SYNTAX WILL BE AS IT IS, IT CANNOT BE CHANGES BY IN ANY CONDITION
+    for example,
+    response:the ai generated response, properties:[proprtyids1, proprtyids2, proprtyids3]
+    """
 
 
-     if user is signed in, for ex you got his name in logging context, raghav
-     user: can i see properties in indore
-     ai: afcouse Raghav I can help you on that, can you tell me what is your desired location you want to see proeprties in indore?
 
-
-    if you got correct details, 
-    you will revert like
-    hello user_name, welcome to the ai peroperty recommedation chatbot how can i help you today?
-
-    if in case you got guest email, and name, you will act like this anything like guest ie. guest name, any email id like dasfasdfja;dfas, or any guest gender you will first ask them some question sequence wise one by one,
-    1.It seems you are not signed in before procedding with chat, can i have your name please?
-    after getting his name
-    2.Thanks for providing name, can i have your valid email id?
-    when we send his mail id,
-    3. than you will ask, him his mobile number
-
-    after getting all these details, now can chat with him like below, if he did'nt give details, ask politly without taking these details, you cannot proced to chatbot.
-
-
-    **Mission:** Guide the user with property-related inquiries. If interested in buying, ask about location, budget, and property type.
-    **Tone:** Friendly and professional, like JARVIS from Iron Man.
-    
-    **Response Rules:**
-    1. You have all the customer search history in the search history you will ananyse based on his search histoy what kind of property he is interested in. In history, you will get all the things like, place, price, bedrooms, location etc. for the further question and answering
-    2. When you start chatting, you will ask multiple questions but always ask one by one to user (maximum ) like :
-        i. location: in which location he want to search also the area of location
-        ii. budget: what will be the budget of the user,
-        iii. bedroom: how many bedroom he need to have 
-        iv. amenities: What type of amenities he want nearby like school, college or anything?
-        always when you talked about amenities give example
-    aftter succesfully gathering all the information about the clinet requirements, you will give the properties are listed in these criteria.
-
-    REMEMBER TO ASK QUESTIONS ONLY ONE BY ONE PER USER, ONE QUESTION AT ONE TIME
-    REMEMBER YOU ARE VERY FRENDLY CHATBOT, YOU HELP USER IN EACH SITUATION FOR BUYIG A PROPERY
-    REMEMBER TO GIVE ANY SUGGESTION only IN property context as i previously mentioned do not create any propery with your own
-    REMEMBER TO GIVE THE PROPERTY SUGGESTONS BASED ON USER INTREST ONLY, LIKE IN HIS BUDGET, HIS WANTED PRICE, LIKE EVERYTHING IS BASED ON USER INTREST, WE CANNOT SUGGEST HIM IN OUT OF HIS INTREST..
-    
-    YOU WILL ALWAYS RESPONSE IN JSON FORMATE LIKE
-    "response":"your response to the user", "properties": "the property id which is in the json formte like _id only which is returned by property context" 
-
-    REMEMBER TO RETURN ONLY PROPERTY ID WHICH IS IN PROPERTY CONTEXT LIKE _ID, the id should be matched by user criteria
-
-    if user ask normal questions, you will return none in properties like properties:[]
-    DO NOT ADD / IN THE ANSWER 
-
-    in the property context you will get
-    _id
-    location
-    max_price
-    min_price
-    area
-    bath_counting
-    room_counting
-    isParking
-    parking_area_counting
-    car_places_counting
-    features
-    property
-    status
-    construction_status
-    pin_code
-    floor
-    bhk
-    facing
-    flat_number
-    sold_out_date
-    is_leasehold
-    lease_year
-    deletedAt
-    createdAt
-    updatedAt
-
-    you will not give the proeprty id when people intracting with you and property's will be updated when you will ask him more questions
-    only on hi and hello only
-    otherwise you will give them the property id's
-    only 3 id you will return for each time
-    you will return json only
-    for each time like this:
-        "response":"Hello, how can I assist you?", "properties":[]
-
-    
-    Example Interactions:
-    User: "Hello"
-    Assistant: "response":"Hello, how can I assist you?", "properties":[]
-
-    User: "Can you suggest properties in Indore?"
-    Assistant: "response":"yes i can suggest yoi", "properties":"032493200dsafh,02345823hfhkah,0237847hsjfah90"
-    here you suggest the property id in property context
-    DO NOT ASK QUESTIONS TO USER MORE THAN 5, AND ALWAYS REPLY ON SAME STATIC WAY LIKE
-    response: "chat response", properties:[3 properties id]
-    ALSO IF THE PROPERTIES NOT AVAILABE, JUST REVERT IN THIS AREA NO PROPERTIES ARE LISTED
-    IF THE ANSWER IS STATIC AND THERE ARE NO PROPERTIES IN THIS
-    ALSWAY SEND proprties:[] with the anwer
-        """
-    
     # Generate response from OpenAI API
     completion = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": prompt},
+            {"role": "system", "content": prompt_user},
             {"role": "user", "content": user_input}
         ]
     )
@@ -326,6 +273,7 @@ def generate_answer(user_input, email):
     
     # Save the generated answer to MongoDB chat history
     summary=create_summary(email["email"])
+    # save_message_to_mongo(user_content=user_input, ai_content=assistant_response,email= email["email"], collection=chat_history_collection,chat_summary=summary,ip_address=email["id"], name=email["name"])
     save_message_to_mongo(user_input, assistant_response, email["email"], chat_history_collection,chat_summary=summary)
     return json_data
 
