@@ -1,11 +1,11 @@
 import os
 from flask import Flask, jsonify, request, session
 from dotenv import load_dotenv
-from get_embeddings import *
+from database.get_embeddings import *
 import uuid
 from flask_cors import CORS
-from get_property_details import get_property_metadata
-from utils import *
+from database.get_property_details import get_property_metadata
+from utils.utils import *
 from bson import ObjectId
 
 
@@ -62,28 +62,35 @@ def affordablity_analysis():
 def chat():
     data = request.json
     auth_token = data.get("auth")
-    ids=data.get("ids")
+    ids = data.get("IP")
     question = data.get("question")
 
+    # Validate the 'question' field
     if not isinstance(question, str) or len(question.strip()) == 0:
         return jsonify({"error": "Invalid 'question' format. Must be a non-empty string."}), 400
     if len(question) > 500:
         return jsonify({"error": "The 'question' field exceeds the maximum allowed length of 500 characters."}), 400
 
-    try:
-        auth = jwt_verify(auth_token)
-    except ValueError as e:
-        return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
-
-    if not auth_token:
-        
+    # Check for 'auth' or fallback to 'ids'
+    if not auth_token:  
+        if not ids:  
+            return jsonify({"error": "Missing required field 'ids' when 'auth' is not provided."}), 400
         auth = {
+            "IP":f"{ids}",
+            "id":"guest_id",
             "name": "Guest",
-            "email": f"{ids}",
+            "email": "Guest@gami.com",
             "gender": "Unknown",
         }
+    else:
+        try:
+            auth = jwt_verify(auth_token)  
+        except ValueError as e:
+            return jsonify({"error": f"Authentication failed: {str(e)}"}), 401
 
     try:
+        # Generate response
+        print(auth)
         response = generate_answer(question, auth)
         answer = response["response"]
         property_ids = response.get("properties", [])
@@ -91,7 +98,6 @@ def chat():
         return jsonify({"response": answer, "property_details": property_details})
     except ValueError as e:
         return jsonify({"error": f"Failed to process response: {str(e)}"}), 500
-
 
 
 # Route to embed and save collection data
