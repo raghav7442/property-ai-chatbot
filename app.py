@@ -103,19 +103,25 @@ def chat():
 # Route to embed and save collection data
 @app.route('/embed', methods=['POST'])
 def embed_collection():
-    # Get the collection name from the request JSON
+
     data = request.get_json()
     collection_name = data.get("collection_name")
 
-    # Validate collection name
+
     if not collection_name:
         return jsonify({"error": "Collection name is required"}), 400
-
-    # Generate and save embeddings for the specified collection
     result = generate_and_save_embeddings(collection_name)
-    
-    # Return success message with result
+
     return jsonify({"message": result})
+
+
+@app.route('/chat_history',methods=['POST'])
+def get_chat_history():
+    data=request.get_json()
+    ip_address= data.get("IP")
+    email=data.get("email")
+    chats=fetch_chat_history(email, ip_address)
+    return jsonify(chats)
 
 
 # Run the Flask application on specified host and port
