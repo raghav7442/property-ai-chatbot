@@ -149,7 +149,7 @@ def fetch_chat_history(email, ip_address):
         {
             "req": "no i want to search properties somewhere else",
             "res": {
-                "properties": ["674f0636d5a12524f74c23f9"],
+                "properties": ["674f046ad5a12524f74c23e6"],
                 "response": "Sure, Govind! Could you please specify the location where you're interested in searching for properties?"
             },
             "timestamp": "Thu, 05 Dec 2024 13:26:05 GMT"
