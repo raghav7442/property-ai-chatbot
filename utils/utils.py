@@ -100,31 +100,78 @@ def save_message_to_mongo( user_content: str,ai_content: str,email: str,collecti
 
 
 @handle_exceptions
-def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
-    """
-    Fetches the chat history for a given user.
+# def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
+#     """
+#     Fetches the chat history for a given user.
     
-    Args:
-        email (str): User's email address.
-        ip_address (str): User's IP address.
+#     Args:
+#         email (str): User's email address.
+#         ip_address (str): User's IP address.
     
-    Returns:
-        list: Chat history.
+#     Returns:
+#         list: Chat history.
     
-    Raises:
-        ValueError: If neither email nor IP address is provided.
-    """
-    if not email and not ip_address:
-        raise ValueError("At least one of email or ip_address must be provided.")
+#     Raises:
+#         ValueError: If neither email nor IP address is provided.
+#     """
+#     if not email and not ip_address:
+#         raise ValueError("At least one of email or ip_address must be provided.")
 
-    query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
-            {"email": email} if email else {"ip_address": ip_address}
+#     query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
+#             {"email": email} if email else {"ip_address": ip_address}
 
-    try:
-        chats = chat_history_collection.find_one(query)
-        return chats.get("history", []) if chats else []
-    except Exception as e:
-        raise Exception(f"Failed to fetch chat history: {e}")
+#     try:
+#         chats = chat_history_collection.find_one(query)
+#         return chats.get("history", []) if chats else []
+#     except Exception as e:
+#         raise Exception(f"Failed to fetch chat history: {e}")
+
+
+def fetch_chat_history(email, ip_address):
+    # Dummy implementation for demonstration
+    return [
+        {
+            "req": "can you suggest me some properties in mumba",
+            "res": {
+                "properties": [],
+                "response": "Welcome back! I see you are logged in, Govind. Could you share which specific location in Mumbai you’re interested in?"
+            },
+            "timestamp": "Thu, 05 Dec 2024 10:57:53 GMT"
+        },
+        {
+            "req": "hi",
+            "res": {
+                "properties": [],
+                "response": "Hello, Govind! How can I assist you today with your property search in Mumbai?"
+            },
+            "timestamp": "Thu, 05 Dec 2024 13:25:40 GMT"
+        },
+        {
+            "req": "no i want to search properties somewhere else",
+            "res": {
+                "properties": ["674f0636d5a12524f74c23f9"],
+                "response": "Sure, Govind! Could you please specify the location where you're interested in searching for properties?"
+            },
+            "timestamp": "Thu, 05 Dec 2024 13:26:05 GMT"
+        },
+        {
+            "req": "can you suggest me some properties in mumba",
+            "res": {
+                "properties": [],
+                "response": "Welcome back! I see you are logged in, Govind. Could you share which specific location in Mumbai you’re interested in?"
+            },
+            "timestamp": "Thu, 05 Dec 2024 13:31:07 GMT"
+        },
+        {
+            "req": "hi kya hal hai?",
+            "res": {
+                "properties": [],
+                "response": "Namaste, Govind! I'm here to help you with property searches. How can I assist you today?"
+            },
+            "timestamp": "Thu, 05 Dec 2024 13:35:12 GMT"
+        }
+    ]
+
 
 
 @handle_exceptions

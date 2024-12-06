@@ -11,7 +11,7 @@ function appendMessage(content, sender = 'bot') {
   message.classList.add('message', sender);
   message.innerText = content;
   chatHistory.appendChild(message);
-  chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to the latest message
+  chatHistory.scrollTop = chatHistory.scrollHeight; 
 }
 
 async function sendMessage() {
@@ -29,8 +29,8 @@ async function sendMessage() {
       },
       body: JSON.stringify({
         question: userInput,
-        auth: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7Il9pZCI6IjY3M2VmZmIyMzU1NjM5NWMyZmYyMjIwZiIsIm5hbWUiOiJHb3ZpbmQgUmFqcHV0IiwiZW1haWwiOiJnb3ZpbmRyYWpwdXQzNzI3QGdtYWlsLmNvbSIsInBhc3N3b3JkIjoiJDJiJDEwJEJqdVE3eVNSekdhNWU3MXNscWh0SmV1NmN4eS5mUWhYcnBsQzZHS1NwUnpvUEkyYWMuVkhXIiwiZGVsZXRlZEF0IjpudWxsLCJyb2xlIjp7Il9pZCI6IjY3MWI0OWVkYTIzYWE4Zjg1MjIwMzQ4MCIsIm5hbWUiOiJ1c2VyIiwiX192IjowfSwiY3JlYXRlZEF0IjoiMjAyNC0xMS0yMVQwOTozODo1OC45MzBaIiwidXBkYXRlZEF0IjoiMjAyNC0xMS0yMVQwOTo0MToyNy41NTRaIiwiX192IjowLCJjaXR5IjoiSW5kb3JlIiwiY291bnRyeSI6IkluZGlhIiwiZ2VuZGVyIjoiTWFsZSIsInBpbl9jb2RlIjoiNDUyMDAxIiwic3RhdGUiOiJNYWRoeWEgUHJhZGVzaCJ9LCJpYXQiOjE3MzMzOTI3NjQsImV4cCI6MTczMzQxMDc2NH0.uNqV61ldCNOd8ERIMnlUhJ7qA2R0aH-QjKIINf-Ky5A", 
-        IP: null, 
+        auth: null, // Placeholder; replace with actual auth token if required
+        IP: '127.0.0.1', // Example IP; replace with real user IP if needed
       }),
     });
 

@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, render_template
 from dotenv import load_dotenv
 from database.get_embeddings import *
 import uuid
@@ -21,13 +21,17 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 app.config.from_pyfile('config.py')  
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  
 
-
-
 # Route for health check to verify the service is running
 @app.route('/', methods=['GET'])
 def check():
     """API route to check if the service is up and running."""
     return jsonify({"status": "Service is running"}), 200
+
+
+@app.route('/form', methods=['GET'])
+def home():
+    return render_template('index.htm')
+
 
 @handle_exceptions
 @app.route("/afford", methods=['POST'])
@@ -99,14 +103,13 @@ def chat():
         property_details = get_property_metadata(property_ids) if property_ids else []
         return jsonify({"response": answer, "property_details": property_details})
     except ValueError as e:
-        return jsonify({"error": f"Failed to process response: {str(e)}"}), 500
+        return jsonify({"response": response, "property":[] }), 500
 
 
 # Route to embed and save collection data
 @handle_exceptions
 @app.route('/embed', methods=['POST'])
 def embed_collection():
-
     data = request.get_json()
     collection_name = data.get("collection_name")
 
@@ -118,23 +121,24 @@ def embed_collection():
     return jsonify({"message": result})
 
 @handle_exceptions
-@app.route('/chat_history',methods=['POST'])
+@app.route('/chat_history', methods=['POST'])
 def get_chat_history():
     data = request.get_json()
     ip_address = data.get("IP")
     email = data.get("email")
     
-    # Assuming fetch_chat_history returns the chat history as a list of dicts
+    # Fetch the chat history
     chats = fetch_chat_history(email, ip_address)
     
-    # Parse the 'res' field in each chat if it's a JSON string
     for chat in chats:
-        if isinstance(chat.get("res"), str):
-            try:
-                chat["res"] = json.loads(chat["res"])  # Parse JSON string to an object
-            except json.JSONDecodeError:
-                chat["res"] = {"error": "Invalid JSON format"}  # Handle parsing errors
-    
+        if isinstance(chat.get("res"), dict):
+            # try:
+                # chat["res"] = json.loads(chat["res"]) 
+            # except json.JSONDecodeError:
+                # chat["res"] = {"error": "Invalid JSON format"}
+            properties = chat["res"].get("properties", [])
+            if properties:
+                chat["res"]["properties"] = get_property_metadata(properties) if properties else []
     return jsonify(chats)
 
 # Run the Flask application on specified host and port

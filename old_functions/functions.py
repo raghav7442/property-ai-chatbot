@@ -87,3 +87,31 @@
 
 #         return session_chat[:]
 #     return []
+
+
+
+
+
+
+
+
+
+
+
+
+# @app.route('/chat_history',methods=['POST'])
+# def get_chat_history():
+#     data = request.get_json()
+#     ip_address = data.get("IP")
+#     email = data.get("email")
+    
+#     # Assuming fetch_chat_history returns the chat history as a list of dicts
+#     chats = fetch_chat_history(email, ip_address)
+#     for chat in chats:
+#         if isinstance(chat.get("res"), str):
+#             try:
+#                 chat["res"] = json.loads(chat["res"]) 
+#             except json.JSONDecodeError:
+#                 chat["res"] = {"error": "Invalid JSON format"}  
+    
+#     return jsonify(chats)
