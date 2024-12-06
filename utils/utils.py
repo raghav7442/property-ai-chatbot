@@ -131,7 +131,7 @@ def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
 def create_summary(email):
     chat_history=fetch_chat_history(email)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
-    prompt=f"""you have to create a very short user driven chatsummary respected to user what user wnat to say in this history
+    prompt=f"""You need to create a very short, user-driven chat summary based on what the user wants to say in this history. For example, the user's name is [name], his email is [email], ad mobile number is [number] he/she want to search for properties in Mumbai, their budget is [budget], and he/she are particularly interested in buying a property in that area. Based on the chat context, you will gather all the user's information, interests, and habits, and create a user summary denoted by 'res' in the chat context. The summary will reflect the user's details, behavior, buying interests, and any concerns related to their purchase.
     here is chat context   {memory_context} 
     """
     completion = client.chat.completions.create(
@@ -260,7 +260,7 @@ def generate_answer(user_input, user_details):
         # raise ValueError(f"Invalid JSON format in response: {assistant_response}")
         return(f"responsee:{assistant_response}, properties:[]")
     except Exception as e:
-        return(f"responsee:{assistant_response}, properties:[]")
+        return  (f"responsee:{assistant_response}, properties:[]")
     
     # Save the generated answer to MongoDB chat history
     summary=create_summary(email)

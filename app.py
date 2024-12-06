@@ -7,6 +7,7 @@ from flask_cors import CORS
 from database.get_property_details import get_property_metadata
 from utils.utils import *
 from bson import ObjectId
+from utils.exceptions import handle_exceptions
 
 
 # Load environment variables from .env file
@@ -28,7 +29,7 @@ def check():
     """API route to check if the service is up and running."""
     return jsonify({"status": "Service is running"}), 200
 
-
+@handle_exceptions
 @app.route("/afford", methods=['POST'])
 def affordablity_analysis():
     data = request.json
@@ -58,6 +59,7 @@ def affordablity_analysis():
 
 
 # Route to handle chat interaction
+@handle_exceptions
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -101,6 +103,7 @@ def chat():
 
 
 # Route to embed and save collection data
+@handle_exceptions
 @app.route('/embed', methods=['POST'])
 def embed_collection():
 
@@ -114,15 +117,25 @@ def embed_collection():
 
     return jsonify({"message": result})
 
-
+@handle_exceptions
 @app.route('/chat_history',methods=['POST'])
 def get_chat_history():
-    data=request.get_json()
-    ip_address= data.get("IP")
-    email=data.get("email")
-    chats=fetch_chat_history(email, ip_address)
+    data = request.get_json()
+    ip_address = data.get("IP")
+    email = data.get("email")
+    
+    # Assuming fetch_chat_history returns the chat history as a list of dicts
+    chats = fetch_chat_history(email, ip_address)
+    
+    # Parse the 'res' field in each chat if it's a JSON string
+    for chat in chats:
+        if isinstance(chat.get("res"), str):
+            try:
+                chat["res"] = json.loads(chat["res"])  # Parse JSON string to an object
+            except json.JSONDecodeError:
+                chat["res"] = {"error": "Invalid JSON format"}  # Handle parsing errors
+    
     return jsonify(chats)
-
 
 # Run the Flask application on specified host and port
 if __name__ == "__main__":
