@@ -56,7 +56,7 @@ def affordablity_analysis():
         
         
     # print(full_property_id)
-        return full_property_id
+        return jsonify({"properties":full_property_id})
     else:
         print("in ek")
         return properties
