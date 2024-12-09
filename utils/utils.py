@@ -33,6 +33,7 @@ embedding_handler = MongoDBEmbeddings(
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[DB_NAME]
 chat_history_collection = db["chat_history_NG"]
+search_history_collection=db["usersearchhistories"]
 
 if not all([DB_NAME, COLLECTION_NAME, MONGO_URI, INDEX_NAME, JWT_SECRET]):
     raise ValueError("Missing required environment variables.")
@@ -126,6 +127,33 @@ def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
     except Exception as e:
         raise Exception(f"Failed to fetch chat history: {e}")
 
+@handle_exceptions
+def user_search_history(user_id: str = None, ip_address: str = None) -> list:
+    """
+    Fetches the search history for a given user.
+    
+    Args:
+        email (str): User's email address.
+        ip_address (str): User's IP address.
+
+    
+    Returns:
+        list: Chat history.
+    
+    Raises:
+        ValueError: If neither email nor IP address is provided.
+    """
+    if not user_id and not ip_address:
+        raise ValueError("At least one of email or ip_address must be provided.")
+
+    query = {"$or": [{"user_id": user_id}, {"ip_address": ip_address}]} if user_id and ip_address else \
+            {"email": user_id} if user_id else {"ip_address": ip_address}
+
+    try:
+        search = search_history_collection.find_one(query)
+        return search.get("search_text", []) if search else []
+    except Exception as e:
+        raise Exception(f"Failed to fetch chat history: {e}")
 
 
 
@@ -212,6 +240,7 @@ def generate_answer(user_input, user_details):
     user_name=user_details["name"]
     user_id=user_details["id"]
     chat_history = fetch_chat_history(email, ip)
+    search_history=user_search_history(user_id,ip)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
     property_context = get_query_results(user_input, limit=6)
     print(f"email:{email}, ipaddress:{ip}, users name:{user_name}")
@@ -219,6 +248,7 @@ def generate_answer(user_input, user_details):
     logging context={user_details}
     memorycontext={memory_context}
     property context={property_context}
+    search context={search_history}
 
     logging context to check the user signed in or not
     for signin or login here is the guildliens
@@ -226,7 +256,10 @@ def generate_answer(user_input, user_details):
     {logging}
     IMPORTANT: If usr is signed in do not ask questions for signing like email, name, mobile number
     after checking the user's logging status you will start the conversation witht the user, here is the detaild flow of the conversation, you have to be static as it is,
+    with this you have all his search history what he search most so it will we our first prefernce to seach what he search most{search_history}
+    and here is all the task for conversaion:
     {task}
+    
 
     for the conversation refference here are some basic examples to intract with the user,
     {sample_conversations}
@@ -306,9 +339,12 @@ def affordable(query, location):
         Requirements:
         1. Always return the property IDs as an array.
         2. Respond only with plain JSON format (no Markdown or additional formatting).
-        3. If no properties match, provide at least 2-3 alternative property IDs from the location context.
+        3. If no properties match, provide more than 3 or more properties within the user saerch consern, alternative property IDs from the location context.
 
         Example response:
+        always give the response with this wether you got properties in provided terms or not if there are no proprty id to show, return 
+        {{"properties": []}}
+        if proprties are there you will return like this,
         {{"properties": ["id1", "id2", "id3"]}}
 
         remember to give only the reponse based on both context, do not create any response with your own
