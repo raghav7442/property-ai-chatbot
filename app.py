@@ -129,14 +129,13 @@ def get_chat_history():
     
     # Fetch the chat history
     chats = fetch_chat_history(email, ip_address)
-    
     for chat in chats:
-        if isinstance(chat.get("res"), dict):
-            properties = chat["res"].get("properties", [])
-            if properties:
-                chat["res"]["properties"] = get_property_metadata(properties) if properties else []
             try:
                 chat["res"] = json.loads(chat["res"]) 
+                if isinstance(chat.get("res"), dict):
+                    properties = chat["res"].get("properties", [])
+                    if properties:
+                        chat["res"]["properties"] = get_property_metadata(properties) if properties else []
             except json.JSONDecodeError:
                 chat["res"] = {"error": "Invalid JSON format"}
     return jsonify(chats)
