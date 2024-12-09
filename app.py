@@ -132,13 +132,13 @@ def get_chat_history():
     
     for chat in chats:
         if isinstance(chat.get("res"), dict):
-            # try:
-                # chat["res"] = json.loads(chat["res"]) 
-            # except json.JSONDecodeError:
-                # chat["res"] = {"error": "Invalid JSON format"}
             properties = chat["res"].get("properties", [])
             if properties:
                 chat["res"]["properties"] = get_property_metadata(properties) if properties else []
+            try:
+                chat["res"] = json.loads(chat["res"]) 
+            except json.JSONDecodeError:
+                chat["res"] = {"error": "Invalid JSON format"}
     return jsonify(chats)
 
 # Run the Flask application on specified host and port
