@@ -85,7 +85,7 @@ def chat():
             "IP":f"{ids}",
             "id":"guest_id",
             "name": "Guest",
-            "email": "Guest@gami.com",
+            "email": "Guest@gmail.com",
             "gender": "Unknown",
         }
     else:
@@ -121,9 +121,9 @@ def embed_collection():
     return jsonify({"message": result})
 
 @handle_exceptions
-@app.route('/chat_history', methods=['POST'])
+@app.route('/chat_history', methods=['GET'])
 def get_chat_history():
-    data = request.get_json()
+    data = request.args
     ip_address = data.get("IP")
     email = data.get("email")
     

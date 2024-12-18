@@ -82,19 +82,21 @@ def save_message_to_mongo( user_content: str,ai_content: str,email: str,collecti
     }
     try:
         collection.update_one(
-            {"email": email},
-            {
-                "$set": {
-                    "email": email,
-                    "ip_address": ip_address,
-                    "user_id":user_id,
-                    "name": name,
-                    "summary": chat_summary
-                },
-                "$push": {"history": message}
-            },
-            upsert=True
-        )
+    {"email": email, "ip_address": ip_address},  # Match on both email and IP
+    {
+        "$set": {
+            "email": email,
+            "ip_address": ip_address,
+            "user_id": user_id,
+            "name": name,
+            "summary": chat_summary
+        },
+        "$push": {"history": message}
+    },
+    upsert=True  # Create a new document if no exact match exists
+)
+
+
     except Exception as e:
         raise Exception(f"Failed to save message to MongoDB: {e}")
 
@@ -118,8 +120,15 @@ def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
     if not email and not ip_address:
         raise ValueError("At least one of email or ip_address must be provided.")
 
-    query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
-            {"email": email} if email else {"ip_address": ip_address}
+    # Determine the query based on the email and IP address logic
+    if email == "Guest@gmail.com" and ip_address:
+        query = {"ip_address": ip_address}
+    elif email and email != "Guest@gmail.com":
+        query = {"email": email}
+    elif ip_address:
+        query = {"ip_address": ip_address}
+    else:
+        query = {"email": email}
 
     try:
         chats = chat_history_collection.find_one(query)
@@ -195,28 +204,25 @@ def get_query_results(user_input: str, limit: int) -> list:
                 }
             },
             {
-                "$project": {
-                    "_id": 1,"location": 1,"max_price": 1,"min_price": 1,"area": 1,"bath_counting":1,
-                    "room_counting": 1,"isParking": 1,"parking_area_counting": 1,
-                    "car_places_counting": 1,
-                    "features": 1,
-                    "property": 1,
-                    "status": 1,
-                    "construction_status": 1,
-                    "pin_code": 1,
-                    "floor": 1,
+                    "$project": {
+                    "_id": 1,
+                    "price": 1,
+                    "area": 1,
+                    "bath_counting": 4,
+                    "property_id": 1,
+                    "floor_id": 1,
+                    "room_counting": 1,
                     "bhk": 1,
                     "facing": 1,
                     "flat_number": 1,
+                    "status": 1,
                     "sold_out_date": 1,
-                    "is_leasehold": 1,
-                    "lease_year": 1,
-                    "deletedAt": 1,
-                    "createdAt": 1,
-                    "updatedAt": 1,
-                    "text":1
-                    
-                }
+                    "type_id": 1,
+                    "block":1,
+                    "unit": 1,
+                    "price_psf": 1,
+                    "plan": 1
+            }
             }
         ]
         collection = embedding_handler.db[embedding_handler.get_collection_name()]
@@ -242,6 +248,7 @@ def generate_answer(user_input, user_details):
     chat_history = fetch_chat_history(email, ip)
     search_history=user_search_history(user_id,ip)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
+    # print(memory_context)
     property_context = get_query_results(user_input, limit=6)
     print(f"email:{email}, ipaddress:{ip}, users name:{user_name}")
     prompt_user=f"""
@@ -257,6 +264,29 @@ def generate_answer(user_input, user_details):
     IMPORTANT: If usr is signed in do not ask questions for signing like email, name, mobile number
     after checking the user's logging status you will start the conversation witht the user, here is the detaild flow of the conversation, you have to be static as it is,
     with this you have all his search history what he search most so it will we our first prefernce to seach what he search most{search_history}
+    In search history you will receive payload like this,
+                     "_id": 
+                    "price":
+                    "area": 
+                    "bath_counting": 
+                    "property_id": 
+                    "floor_id": 
+                    "room_counting": 
+                    "bhk": 
+                    "facing": 
+                    "flat_number": 
+                    "status": 
+                    "sold_out_date": 
+                    "type_id": 
+                    "block":
+                    "unit": 
+                    "price_psf": 
+                    "plan":
+            you have to check if there are in user's desired search, in the price, area, bath count, room count etc than you will provide the desired property id's to user, if not than you say to user there are no properties in your budget, do you want to search in another location or if the budget is not matched ask him to add more budget or less budget according to the property context,
+
+            please also do some smart work, like if we have some property in around the users requirement like if user gave us price like 45000000, if we have properties around the price, we will give to user those properties, if not we will give some other properties in the same area, so it will be very smart work,
+
+
     and here is all the task for conversaion:
     {task}
     
@@ -269,6 +299,7 @@ def generate_answer(user_input, user_details):
     WHEN EVER FOR EACH CONVERSATION YOUR RESPONSE SYNTAX WILL BE AS IT IS, IT CANNOT BE CHANGES BY IN ANY CONDITION
     for example,
     response:the ai generated response, properties:[proprtyids1, proprtyids2, proprtyids3]
+    RESPONSE GUIDENCES: JUST RETURN THE JSON, PLEASE DO NOT ADD ANY FORMATING IN THAT, LIKE NEW LINE, ``` COLUMNS, BOLD TEXT ETC JUST RETURN SIMPLE JSON, PLEASE IT I AM RETRIVING BOTH OF PROPERTIES AND RESPONSE, IN DIFFERENT USECASES, SO IT IS VERY IMPORTANT TO ME TO HAVE AN REPONSE IN JSON SO KINDLY DO NOT USE FORMATTING TEXT FORMATTING.
     """
     # Generate response from OpenAI API
     completion = client.chat.completions.create(
