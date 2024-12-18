@@ -170,7 +170,7 @@ def user_search_history(user_id: str = None, ip_address: str = None) -> list:
 def create_summary(email):
     chat_history=fetch_chat_history(email)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
-    prompt=f"""You need to create a very short, user-driven chat summary based on what the user wants to say in this history. For example, the user's name is [name], his email is [email], ad mobile number is [number] he/she want to search for properties in Mumbai, their budget is [budget], and he/she are particularly interested in buying a property in that area. Based on the chat context, you will gather all the user's information, interests, and habits, and create a user summary denoted by 'res' in the chat context. The summary will reflect the user's details, behavior, buying interests, and any concerns related to their purchase.
+    prompt=f"""You need to create a very short, user-driven chat summary based on what the user wants to say in this history. For example, the user's name is [name], his email is [email], ad mobile number is [number] he/she want to search for properties in Mumbai, their budget is [budget], and he/she are particularly interested in buying a property in that area. Based on the chat context, you will gather all the user's information, interests, and habits, and create a user summary denoted by 'req' in the chat context. The summary will reflect the user's details, behavior, buying interests, and any concerns related to their purchase.
     here is chat context   {memory_context} 
     """
     completion = client.chat.completions.create(
