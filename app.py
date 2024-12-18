@@ -121,7 +121,7 @@ def embed_collection():
     return jsonify({"message": result})
 
 @handle_exceptions
-@app.route('/chat_history', methods=['GET'])
+@app.route('/chat_history', methods=['POST'])
 def get_chat_history():
     data = request.args
     ip_address = data.get("IP")
@@ -129,6 +129,7 @@ def get_chat_history():
     
     # Fetch the chat history
     chats = fetch_chat_history(email, ip_address)
+    print(chats)
     for chat in chats:
             try:
                 chat["res"] = json.loads(chat["res"]) 

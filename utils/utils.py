@@ -120,22 +120,14 @@ def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
     if not email and not ip_address:
         raise ValueError("At least one of email or ip_address must be provided.")
 
-    # Determine the query based on the email and IP address logic
-    if email == "Guest@gmail.com" and ip_address:
-        query = {"ip_address": ip_address}
-    elif email and email != "Guest@gmail.com":
-        query = {"email": email}
-    elif ip_address:
-        query = {"ip_address": ip_address}
-    else:
-        query = {"email": email}
+    query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
+            {"email": email} if email else {"ip_address": ip_address}
 
     try:
         chats = chat_history_collection.find_one(query)
         return chats.get("history", []) if chats else []
     except Exception as e:
         raise Exception(f"Failed to fetch chat history: {e}")
-
 @handle_exceptions
 def user_search_history(user_id: str = None, ip_address: str = None) -> list:
     """
