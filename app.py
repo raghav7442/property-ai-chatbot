@@ -86,7 +86,7 @@ def chat():
             "id":"guest_id",
             "name": "Guest",
             "email": "Guest@gmail.com",
-            "gender": "Unknown",
+            # "gender": "Unknown",
         }
     else:
         try:

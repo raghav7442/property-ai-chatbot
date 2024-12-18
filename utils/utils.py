@@ -59,7 +59,7 @@ def jwt_verify(token: str) -> dict:
             "id": jwt_token["user"]["_id"],
             "name": jwt_token["user"]["name"],
             "email": jwt_token["user"]["email"],
-            "gender": jwt_token["user"]["gender"]
+            # "gender": jwt_token["user"]["gender"]
         }
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired.")
