@@ -123,7 +123,7 @@ def embed_collection():
 @handle_exceptions
 @app.route('/chat_history', methods=['POST'])
 def get_chat_history():
-    data = request.args
+    data = request.json
     ip_address = data.get("IP")
     email = data.get("email")
     
