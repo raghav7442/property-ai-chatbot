@@ -8,6 +8,7 @@ from database.get_property_details import get_property_metadata
 from utils.utils import *
 from bson import ObjectId
 from utils.exceptions import handle_exceptions
+import asyncio
 
 
 # Load environment variables from .env file
@@ -23,19 +24,19 @@ app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
 
 # Route for health check to verify the service is running
 @app.route('/', methods=['GET'])
-def check():
+async def check():
     """API route to check if the service is up and running."""
     return jsonify({"status": "Service is running"}), 200
 
 
 @app.route('/form', methods=['GET'])
-def home():
+async def home():
     return render_template('index.htm')
 
 
 @handle_exceptions
 @app.route("/afford", methods=['POST'])
-def affordablity_analysis():
+async def affordablity_analysis():
     data = request.json
 
         # Validate input parameters
@@ -65,7 +66,7 @@ def affordablity_analysis():
 # Route to handle chat interaction
 @handle_exceptions
 @app.route('/chat', methods=['POST'])
-def chat():
+async def chat():
     data = request.json
     auth_token = data.get("auth")
     ids = data.get("IP")
@@ -109,7 +110,7 @@ def chat():
 # Route to embed and save collection data
 @handle_exceptions
 @app.route('/embed', methods=['POST'])
-def embed_collection():
+async def embed_collection():
     data = request.get_json()
     collection_name = data.get("collection_name")
 
@@ -122,7 +123,7 @@ def embed_collection():
 
 @handle_exceptions
 @app.route('/chat_history', methods=['POST'])
-def get_chat_history():
+async def get_chat_history():
     data = request.json
     ip_address = data.get("IP")
     email = data.get("email")
