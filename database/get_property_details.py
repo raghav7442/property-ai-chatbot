@@ -2,7 +2,6 @@ from bson import ObjectId, json_util
 from pymongo import MongoClient
 import os
 import logging
-import json
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -25,22 +24,14 @@ db = client[os.getenv("DB_NAME")]
 # Replace 'your_collection_name' with the collection you are querying
 property_metadata_collection = db[os.getenv("COLLECTION_NAME")]
 
-# Function to normalize ObjectId to string
-def normalize_objectids(data):
-    if isinstance(data, list):
-        return [normalize_objectids(item) for item in data]
-    elif isinstance(data, dict):
-        return {key: str(value) if isinstance(value, ObjectId) else normalize_objectids(value) for key, value in data.items()}
-    return data
-
-# Function to fetch property metadata for a single meta_id
-def get_single_property_metadata(meta_id):
+# Function to fetch property metadata for multiple meta_ids
+def get_property_metadata(meta_ids):
     try:
-        if not ObjectId.is_valid(meta_id):
-            raise ValueError(f"Invalid meta_id: {meta_id} is not a valid ObjectId.")
+        if not isinstance(meta_ids, list) or not all(ObjectId.is_valid(meta_id) for meta_id in meta_ids):
+            raise ValueError("meta_ids must be a list of valid ObjectIds.")
 
         pipeline = [
-            {"$match": {"_id": ObjectId(meta_id)}},
+            {"$match": {"_id": {"$in": [ObjectId(meta_id) for meta_id in meta_ids]}}},
             {
                 "$lookup": {
                     "from": "images",
@@ -58,56 +49,115 @@ def get_single_property_metadata(meta_id):
                     "localField": "property",
                     "foreignField": "_id",
                     "pipeline": [
-                        {"$project": {"embedding": 0, "name": 0, "description": 0, "country": 0, "state": 0, "city": 0, "property_type": 0, "deletedAt": 0, "createdAt": 0, "updatedAt": 0, "full_address": 0, "deleted_at": 0}},
+                        {
+                            "$project": {
+                                "_id": 1,
+                                "title": 1,
+                                "address": 1,
+                                "property_owner": 1,
+                                "longitude": 1,
+                                "latitude": 1,
+                                "pin_code": 1,
+                                "project_developer": 1,
+                                "parking_area_counting": 1,
+                                "car_places_counting": 1,
+                                "construction_status": 1,
+                                "is_leasehold": 1,
+                                "lease_year": 1,
+                                "is_feature_property": 1,
+                                "blocks": 1,
+                                "unit_mix_breakdown": 1,
+                                "schematic": 1,
+                            }
+                        }
                     ],
                     "as": "propertyDetails",
                 }
             },
+             
             {"$unwind": {"path": "$propertyDetails", "preserveNullAndEmptyArrays": True}},
+              {
+                "$lookup": {
+                    "from": "images",
+                    "localField": "propertyDetails._id",
+                    "foreignField": "recordId",  
+                    "as": "propertyDetails.images",
+                }
+            },
             {
                 "$lookup": {
                     "from": "propertyowners",
                     "localField": "propertyDetails.property_owner",
                     "foreignField": "_id",
                     "pipeline": [
-                        {"$project": {"embedding": 0}}
+                        {
+                            "$project": {
+                                "_id": 0,
+                                "fname": 1,
+                                "lname": 1,
+                                "email": 1,
+                                "description": 1,
+                                "country": 1,
+                                "state": 1,
+                                "city": 1,
+                                "pin_code": 1,
+                                "mobile": 1,
+                                "gender": 1,
+                            }
+                        }
                     ],
-                    "as": "propertyDetails.propertyOwnerDetails",
+                    "as": "propertyDetails.property_owner",
                 }
             },
-            {"$unwind": {"path": "$propertyDetails.propertyOwnerDetails", "preserveNullAndEmptyArrays": True}},
+            {"$unwind": {"path": "$propertyDetails.property_owner", "preserveNullAndEmptyArrays": True}},
             {"$project": {"embedding": 0}},
         ]
 
-        logging.info(f"Executing pipeline for meta_id: {meta_id}")
-        result = list(property_metadata_collection.aggregate(pipeline))
+        logging.info("Executing aggregation pipeline for multiple meta_ids.")
+        results = list(property_metadata_collection.aggregate(pipeline))
 
-        return normalize_objectids(result)
+        # Group by property_id and format the results
+        grouped_properties = {}
+        for item in results:
+            property_details = item.get("propertyDetails", {})
+            if property_details:
+                property_id = str(property_details["_id"])
+                if property_id not in grouped_properties:
+                    grouped_properties[property_id] = {
+                        "property_id": property_id,
+                        "details": {
+                            "title": property_details.get("title"),
+                            "address": property_details.get("address"),
+                            "property_owner": property_details.get("property_owner"),
+                            "location": {
+                                "longitude": property_details.get("longitude"),
+                                "latitude": property_details.get("latitude"),
+                                "coordinates": [
+                                    property_details.get("longitude"),
+                                    property_details.get("latitude"),
+                                ],
+                                "type": "Point",
+                            },
+                            "pin_code": property_details.get("pin_code"),
+                            "project_developer": property_details.get("project_developer"),
+                            "parking_area_counting": property_details.get("parking_area_counting"),
+                            "car_places_counting": property_details.get("car_places_counting"),
+                            "construction_status": property_details.get("construction_status"),
+                            "is_leasehold": property_details.get("is_leasehold"),
+                            "lease_year": property_details.get("lease_year"),
+                            "is_feature_property": property_details.get("is_feature_property"),
+                            "blocks": property_details.get("blocks"),
+                            "unit_mix_breakdown": property_details.get("unit_mix_breakdown"),
+                            "schematic": property_details.get("schematic"),
+                        },
+                        "meta_data": [],
+                    }
+                # Append metadata to the property
+                item["_id"] = str(item["_id"])
+                grouped_properties[property_id]["meta_data"].append(item)
 
-    except ValueError as ve:
-        logging.error(f"Validation error: {ve}")
-        return {"error": str(ve)}
-
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return {"error": "An unexpected error occurred. Please check the logs for details."}
-
-# Function to fetch property metadata for multiple meta_ids
-def get_property_metadata(meta_ids):
-    try:
-        if not isinstance(meta_ids, list):
-            raise ValueError("meta_ids must be a list of ObjectIds.")
-
-        all_results = []
-        for meta_id in meta_ids:
-            result = get_single_property_metadata(meta_id)
-            if "error" not in result:
-                all_results.extend(result)
-            else:
-                logging.warning(f"Skipping meta_id {meta_id} due to error: {result['error']}")
-
-        logging.info(f"Retrieved metadata for {len(all_results)} records.")
-        return all_results
+        logging.info(f"Retrieved metadata for {len(grouped_properties)} properties.")
+        return {"properties": list(grouped_properties.values())}
 
     except ValueError as ve:
         logging.error(f"Validation error: {ve}")
@@ -118,11 +168,11 @@ def get_property_metadata(meta_ids):
         return {"error": "An unexpected error occurred. Please check the logs for details."}
 
 # Example usage
-# if __name__ == "__main__":
-#     meta_ids = ["673b27fe4483cd7d1a3df9fd", "623b27fe4483cd7d1a3df9fa"]
-#     result = get_property_metadata(meta_ids)
-#     if "error" in result:
-#         logging.error(f"Failed to fetch property metadata: {result['error']}")
-#     else:
-#         logging.info("Property metadata retrieved successfully.")
-#         print(json.dumps(result, indent=4))
+if __name__ == "__main__":
+    meta_ids = ["678e5e0cda8481dd0faa68a1", "678e40d8536510ee622e30ec"]
+    result = get_property_metadata(meta_ids)
+    if "error" in result:
+        logging.error(f"Failed to fetch property metadata: {result['error']}")
+    else:
+        logging.info("Property metadata retrieved successfully.")
+        print(json_util.dumps(result, indent=4))

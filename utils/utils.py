@@ -105,7 +105,7 @@ def save_message_to_mongo( user_content: str,ai_content: str,email: str,collecti
 @handle_exceptions
 def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
     """
-    Fetches the chat history for a given user.
+    Fetches the chat history for a given user, with special handling for guest users.
     
     Args:
         email (str): User's email address.
@@ -115,19 +115,27 @@ def fetch_chat_history(email: str = None, ip_address: str = None) -> list:
         list: Chat history.
     
     Raises:
-        ValueError: If neither email nor IP address is provided.
+        ValueError: If neither email nor IP address is provided, or if guest email is provided without IP.
     """
     if not email and not ip_address:
         raise ValueError("At least one of email or ip_address must be provided.")
-
-    query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
-            {"email": email} if email else {"ip_address": ip_address}
+        
+    if email == "Guest@gmail.com":
+        if not ip_address:
+            raise ValueError("IP address is required for guest users.")
+        # For guest users, we only use IP address
+        query = {"ip_address": ip_address}
+    else:
+        # For regular users, use both if available
+        query = {"$or": [{"email": email}, {"ip_address": ip_address}]} if email and ip_address else \
+                {"email": email} if email else {"ip_address": ip_address}
 
     try:
         chats = chat_history_collection.find_one(query)
         return chats.get("history", []) if chats else []
     except Exception as e:
         raise Exception(f"Failed to fetch chat history: {e}")
+    
 @handle_exceptions
 def user_search_history(user_id: str = None, ip_address: str = None) -> list:
     """
@@ -159,8 +167,8 @@ def user_search_history(user_id: str = None, ip_address: str = None) -> list:
 
 
 @handle_exceptions
-def create_summary(email):
-    chat_history=fetch_chat_history(email)
+def create_summary(email: str = None, ip_address: str = None):
+    chat_history=fetch_chat_history(email, ip_address)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
     prompt=f"""You need to create a very short, user-driven chat summary based on what the user wants to say in this history. For example, the user's name is [name], his email is [email], ad mobile number is [number] he/she want to search for properties in Mumbai, their budget is [budget], and he/she are particularly interested in buying a property in that area. Based on the chat context, you will gather all the user's information, interests, and habits, and create a user summary denoted by 'req' in the chat context. The summary will reflect the user's details, behavior, buying interests, and any concerns related to their purchase.
     here is chat context   {memory_context} 
@@ -197,25 +205,24 @@ def get_query_results(user_input: str, limit: int) -> list:
             },
             {
                     "$project": {
-                    "_id": 1,
-                    "price": 1,
-                    "area": 1,
-                    "bath_counting": 4,
-                    "property_id": 1,
-                    "floor_id": 1,
-                    "room_counting": 1,
-                    "bhk": 1,
-                    "facing": 1,
-                    "flat_number": 1,
-                    "status": 1,
-                    "sold_out_date": 1,
-                    "type_id": 1,
-                    "block":1,
-                    "unit": 1,
-                    "price_psf": 1,
-                    "plan": 1
-            }
-            }
+                        "_id": 0,
+                        "price": 1,
+                        "area": 1,
+                        "bath_counting": 1,
+                        "room_counting": 1,
+                        "features": 1,
+                        "property": 1,
+                        "status": 1,
+                        "bhk": 1,
+                        "facing": 1,
+                        "sold_out_date": 1,
+                        "full_address": 1,
+                        "block": 1,
+                        "unit": 1,
+                        "price_psf": 1,
+                        "plan": 1
+                    }
+                }
         ]
         collection = embedding_handler.db[embedding_handler.get_collection_name()]
         results = collection.aggregate(pipeline)
@@ -240,9 +247,7 @@ def generate_answer(user_input, user_details):
     chat_history = fetch_chat_history(email, ip)
     search_history=user_search_history(user_id,ip)
     memory_context = "\n".join([f"User: {msg['req']}\nAssistant: {msg['res']}" for msg in chat_history])
-    # print(memory_context)
     property_context = get_query_results(user_input, limit=6)
-    print(f"email:{email}, ipaddress:{ip}, users name:{user_name}")
     prompt_user=f"""
     logging context={user_details}
     memorycontext={memory_context}
@@ -257,23 +262,24 @@ def generate_answer(user_input, user_details):
     after checking the user's logging status you will start the conversation witht the user, here is the detaild flow of the conversation, you have to be static as it is,
     with this you have all his search history what he search most so it will we our first prefernce to seach what he search most{search_history}
     In search history you will receive payload like this,
-                     "_id": 
-                    "price":
-                    "area": 
-                    "bath_counting": 
-                    "property_id": 
-                    "floor_id": 
-                    "room_counting": 
-                    "bhk": 
-                    "facing": 
-                    "flat_number": 
-                    "status": 
-                    "sold_out_date": 
-                    "type_id": 
-                    "block":
-                    "unit": 
-                    "price_psf": 
-                    "plan":
+                             "location": here you will found the location of the property,
+                            "price": ,
+                            "area": ,
+                            "bath_counting": ,
+                            "room_counting": ,
+                            "features": this is the feature of property like gym, pool etc,
+                            "property":,
+                            "floor": ,
+                            "status": ,
+                            "bhk": ,
+                            "facing": ,
+                            "sold_out_date": ,
+                            "full_address": ,
+                            "block": ,
+                            "unit": ,
+                            "price_psf": ,
+                            "plan": ,
+                            "type": ,
             you have to check if there are in user's desired search, in the price, area, bath count, room count etc than you will provide the desired property id's to user, if not than you say to user there are no properties in your budget, do you want to search in another location or if the budget is not matched ask him to add more budget or less budget according to the property context,
 
             please also do some smart work, like if we have some property in around the users requirement like if user gave us price like 45000000, if we have properties around the price, we will give to user those properties, if not we will give some other properties in the same area, so it will be very smart work,
@@ -295,7 +301,7 @@ def generate_answer(user_input, user_details):
     """
     # Generate response from OpenAI API
     completion = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-o3-mini",
         messages=[
             {"role": "system", "content": prompt_user},
             {"role": "user", "content": user_input}
@@ -321,7 +327,7 @@ def generate_answer(user_input, user_details):
         return  (f"responsee:{assistant_response}, properties:[]")
     
     # Save the generated answer to MongoDB chat history
-    summary=create_summary(email)
+    summary=create_summary(email,ip)
     save_message_to_mongo(user_input,assistant_response,email,chat_history_collection,summary,ip,user_name,user_id)
     return json_data
 

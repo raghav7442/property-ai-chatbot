@@ -2,6 +2,7 @@ from pymongo import MongoClient
 import pandas as pd
 from openai import OpenAI
 import os
+import threading
 
 # MongoDB connection setup
 def get_mongo_collection(collection_name):
@@ -22,10 +23,11 @@ def generate_embedding(text):
 def generate_and_save_embeddings(collection_name):
     collection = get_mongo_collection(collection_name)
     cursor = collection.find()  # Fetch documents from MongoDB
-
+    threads=[]
     updated_count = 0  # Counter for updated rows
 
     for document in cursor:
+        threading.Thread(target=generate_embedding, args=(document,)).start()
         # Combine fields for embedding generation
         text = f"{document.get('name', '')} {document.get('description', '')}"
         

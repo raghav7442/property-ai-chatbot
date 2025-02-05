@@ -2,11 +2,9 @@ import os
 from flask import Flask, jsonify, request, session, render_template
 from dotenv import load_dotenv
 from database.get_embeddings import *
-import uuid
 from flask_cors import CORS
 from database.get_property_details import get_property_metadata
 from utils.utils import *
-from bson import ObjectId
 from utils.exceptions import handle_exceptions
 import asyncio
 
@@ -97,8 +95,8 @@ async def chat():
 
     try:
         # Generate response
-        print(auth)
-        response = generate_answer(question, auth)
+        # response = generate_answer(question, auth)
+        response= await asyncio.to_thread(generate_answer, question, auth)
         answer = response["response"]
         property_ids = response.get("properties", [])
         property_details = get_property_metadata(property_ids) if property_ids else []
